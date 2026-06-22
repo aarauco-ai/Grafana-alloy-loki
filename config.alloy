@@ -1,0 +1,19 @@
+// 1. Escuchar los logs que Railway nos va a enviar por HTTP
+loki.source.http "railway_receiver" {
+  http {
+    listen_address = "0.0.0.0"
+    listen_port    = 8080
+  }
+  forward_to = [loki.write.grafana_cloud_loki.receiver]
+}
+
+// 2. Enviar esos logs cifrados a Grafana Cloud
+loki.write "grafana_cloud_loki" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_INSTANCE_ID")
+      password = sys.env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}
