@@ -1,19 +1,45 @@
-// 1. Escuchar los logs que Railway nos va a enviar por HTTP
-loki.source.http "railway_receiver" {
+// 1. Receptor HTTP para Locomotive (Red interna de Railway)
+loki.source.api "railway_receiver" {
   http {
     listen_address = "0.0.0.0"
-    listen_port    = 8080
+    listen_port    = 9999
   }
-  forward_to = [loki.write.grafana_cloud_loki.receiver]
+  forward_to = [loki.process.parse_railway.receiver]
 }
 
-// 2. Enviar esos logs cifrados a Grafana Cloud
-loki.write "grafana_cloud_loki" {
+// 2. Procesamiento y desempaquetado del JSON de Railway / Locomotive
+loki.process "parse_railway" {
+  stage.json {
+    expressions = {
+      message = "[0].message",
+      log     = "[0].log",
+    }
+  }
+
+  stage.output {
+    source = "message"
+  }
+
+  stage.static_labels {
+    values = { 
+      job       = "railway_logs",
+      forwarder = "locomotive",
+    }
+  }
+
+  forward_to = [loki.write.grafana_cloud.receiver]
+}
+
+// 3. Envío seguro a Grafana Cloud usando Variables de Entorno
+loki.write "grafana_cloud" {
   endpoint {
-    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+    // Lee la URL de Loki desde las variables de Railway
+    url = sys.env("GRAFANA_LOKI_URL")
+
     basic_auth {
-      username = sys.env("GRAFANA_CLOUD_INSTANCE_ID")
-      password = sys.env("GRAFANA_CLOUD_API_KEY")
+      // Lee el usuario y el token desde las variables de Railway
+      username = sys.env("GRAFANA_USER")
+      password = sys.env("GRAFANA_TOKEN")
     }
   }
 }
